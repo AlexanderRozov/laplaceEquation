@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace LaplaceMethod
 {
@@ -24,6 +25,10 @@ namespace LaplaceMethod
         public Point[,] Matrix { get; set; }
         public Point[,] DuplicatedMatrix { get; set; }
 
+        public double TotalTime { get; set; }
+
+        public int Iterations { get; set; }
+
         public LaplaceParallel(
             double leftBorder,
             double topBorder, 
@@ -31,7 +36,8 @@ namespace LaplaceMethod
             double bottomBorder, 
             int[] xInterval, 
             int[] yInterval, 
-            double step
+            double step,
+            int iterations
         )
         {
             Step = step;
@@ -46,9 +52,22 @@ namespace LaplaceMethod
             Matrix = new Point[Size + 1, Size + 1];
             DuplicatedMatrix = new Point[Size + 1, Size + 1];
 
+            TotalTime = 0;
+
+            Iterations = iterations;
+
             FillGrid(Matrix);
             FillGrid(DuplicatedMatrix);
             Run();
+        }
+
+        public void Reset()
+        {
+            Matrix = new Point[Size + 1, Size + 1];
+            DuplicatedMatrix = new Point[Size + 1, Size + 1];
+
+            FillGrid(Matrix);
+            FillGrid(DuplicatedMatrix);
         }
 
         public void FillGrid(Point[,] matrix)
@@ -79,26 +98,41 @@ namespace LaplaceMethod
                         zValue = RightBorder;
                     }
                     matrix[i, j] = new Point(xValue, yValue, zValue);
-                    xValue = Math.Round(xValue + Step, 1);
+                    xValue = Math.Round(xValue + Step, 5);
                 }
                 xValue = 0;
-                yValue = Math.Round(yValue - Step, 1);
+                yValue = Math.Round(yValue - Step, 5);
             }
         }
 
         public void Run()
         {
-            Thread firstMatrixThread = new Thread(CalcFirstMatrix);
-            Thread secondMatrixThread = new Thread(CalcSecondMatrix);
+            Thread firstMatrixThread, secondMatrixThread;
+            Stopwatch sw = new Stopwatch();
+            TimeSpan ts;
 
-            firstMatrixThread.Start();
-            secondMatrixThread.Start();
-            firstMatrixThread.Join();
-            secondMatrixThread.Join();
+            for (var i = 0; i < Iterations; i++)
+            {
+                firstMatrixThread = new Thread(CalcFirstMatrix);
+                secondMatrixThread = new Thread(CalcSecondMatrix);
 
-            AddMatrixes();
+                sw.Start();
 
-            CalcFinalMatrix();
+                firstMatrixThread.Start();
+                secondMatrixThread.Start();
+                firstMatrixThread.Join();
+                secondMatrixThread.Join();
+
+                AddMatrixes();
+
+                CalcFinalMatrix();
+
+                sw.Stop();
+                ts = sw.Elapsed;
+                TotalTime += ts.TotalMilliseconds;
+                sw.Reset();
+            }
+            TotalTime /= Iterations;
         }
 
         public void CalcFirstMatrix()
@@ -139,7 +173,7 @@ namespace LaplaceMethod
             {
                 for (int j = 1; j < Size; j++)
                 {
-                    Matrix[i, j].Z = (Matrix[i - 1, j - 1].Z + Matrix[i - 1, j].Z + Matrix[i, j - 1].Z) / 3;
+                    Matrix[i, j].Z = Math.Round((Matrix[i - 1, j - 1].Z + Matrix[i - 1, j].Z + Matrix[i, j - 1].Z) / 3, 5);
                 }
             }
         }
@@ -150,7 +184,7 @@ namespace LaplaceMethod
             {
                 for (int j = Size - 1; j >= 1; j--)
                 {
-                    DuplicatedMatrix[i, j].Z = (DuplicatedMatrix[i + 1, j + 1].Z + DuplicatedMatrix[i + 1, j].Z + DuplicatedMatrix[i, j + 1].Z) / 3;
+                    DuplicatedMatrix[i, j].Z = Math.Round((DuplicatedMatrix[i + 1, j + 1].Z + DuplicatedMatrix[i + 1, j].Z + DuplicatedMatrix[i, j + 1].Z) / 3, 5);
                 }
             }
         }
